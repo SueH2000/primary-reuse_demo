@@ -193,36 +193,6 @@ Near-term:
 
 The public demo uses `linear_model_plus_rag` as the stable decision path. LLM modes are reviewer aids. If the baseline prediction is high-confidence auto-accept, the LLM may still be called for diagnostic comparison, but it cannot overwrite the final label. This prevents direct LLM classification from changing strong evidence-backed decisions. See `docs/llm_guardrails.md`.
 
-
-## UI model selector note
-
-Version v5.2 keeps the cleaned public demo layout while restoring visible model selection. The default is still `Hybrid baseline`, but users can select `Linear only`, `RAG vote only`, and experimental LLM reviewer modes from the model selector. The selected-mode bar shows exactly which paths will run before classification.
-
-## v5.3 Pipeline UI
-
-The public review console now separates model selection into two layers:
-
-1. **Base decision model**: Linear only, Hybrid baseline, or RAG vote only.
-2. **Optional LLM reviewer**: no LLM, sentence reviewer, or LLM classifier in routed/force mode.
-
-This reflects the intended product logic: the LLM is a reviewer layer after the evidence-based baseline, not a peer baseline model. High-confidence baseline decisions remain locked.
-
-
-
-## UI note: v5.4 multi-base comparison
-
-The review console supports selecting one or more base decision models and applying the same optional LLM reviewer layer after each selected baseline. This keeps the product logic clear: baseline models are compared side by side, while the LLM acts as a reviewer layer rather than a parallel baseline.
-
-## v5.5: RAG-grounded LLM reviewer
-
-The UI now separates **RAG as a baseline comparator** from **RAG as LLM grounding context**. `RAG vote only` remains available as a model path for comparison, while the optional LLM reviewer can receive retrieved labeled neighbors directly in its prompt. This makes the pipeline explicit: baseline model(s) first, RAG-grounded LLM review second, guardrailed final decision last.
-
-
-## UI v5.5.1 note
-
-The right-side neighbor table now represents **LLM grounding neighbors**. If RAG grounding is disabled, that table is hidden even though neighbors may still be computed internally for baseline RAG features or RAG-vote comparison.
-
-
 ## Ollama backend modes
 
 The optional LLM reviewer supports both local Ollama and Ollama Cloud.
