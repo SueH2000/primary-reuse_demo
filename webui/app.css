@@ -1326,3 +1326,71 @@ tbody tr:hover {
 }
 
 .hidden { display: none !important; }
+
+
+/* Feedback and toast states */
+.feedback-result {
+  min-height: 1.6rem;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+}
+.feedback-running {
+  color: var(--accent-warm);
+  background: rgba(246, 187, 96, 0.10);
+  border: 1px solid rgba(246, 187, 96, 0.22);
+}
+.feedback-success {
+  color: var(--accent);
+  background: rgba(124, 227, 192, 0.10);
+  border: 1px solid rgba(124, 227, 192, 0.22);
+}
+.feedback-warning {
+  color: var(--accent-warm);
+  background: rgba(246, 187, 96, 0.10);
+  border: 1px solid rgba(246, 187, 96, 0.26);
+}
+.feedback-error {
+  color: var(--danger);
+  background: rgba(231, 109, 117, 0.10);
+  border: 1px solid rgba(231, 109, 117, 0.26);
+}
+.status-pill.warning {
+  background: rgba(246, 187, 96, 0.14);
+  color: var(--accent-warm);
+}
+.toast-host {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  gap: 10px;
+  z-index: 9999;
+  max-width: min(420px, calc(100vw - 32px));
+}
+.toast {
+  padding: 13px 16px;
+  border-radius: 14px;
+  background: rgba(9, 26, 35, 0.98);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: var(--shadow);
+  line-height: 1.45;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.toast-success {
+  border-color: rgba(124, 227, 192, 0.36);
+}
+.toast-warning {
+  border-color: rgba(246, 187, 96, 0.42);
+}
+.toast-error {
+  border-color: rgba(231, 109, 117, 0.42);
+}
+.toast-hide {
+  opacity: 0;
+  transform: translateY(8px);
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

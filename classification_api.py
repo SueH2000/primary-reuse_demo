@@ -1027,17 +1027,31 @@ def save_feedback(req: FeedbackRequest) -> Dict[str, Any]:
             evidence_sentence=req.evidence_sentence,
             result_json=req.result_json or {},
         )
-        supabase_result = insert_pending_feedback(payload)
-        return {
-            "saved": True,
-            "storage": "supabase_pending_feedback",
-            "review_status": "pending",
-            "approved_for_rag": False,
-            "message": "Feedback saved for curator review. It will not update the RAG bank until approved and exported.",
-            "feedback_store_path": local_result.get("feedback_store_path", ""),
-            "supabase": supabase_result,
-            "row": local_result.get("row", {}),
-        }
+        try:
+            supabase_result = insert_pending_feedback(payload)
+            return {
+                "saved": True,
+                "storage": "supabase_pending_feedback",
+                "review_status": "pending",
+                "approved_for_rag": False,
+                "message": "Thank you. Feedback was saved to the pending review database. It will not update the RAG bank until approved and exported.",
+                "feedback_store_path": local_result.get("feedback_store_path", ""),
+                "supabase": supabase_result,
+                "row": local_result.get("row", {}),
+            }
+        except Exception as exc:
+            # Keep the user informed instead of failing silently in the UI.
+            # The local CSV fallback is useful during development, but it is not durable on free cloud hosts.
+            return {
+                "saved": True,
+                "storage": "local_feedback_csv_supabase_failed",
+                "review_status": "local_unreviewed",
+                "approved_for_rag": False,
+                "message": "Feedback was saved locally, but Supabase pending-feedback insert failed. Check Render environment variables, the rag_feedback table, and Supabase logs before relying on public collection.",
+                "warning": str(exc),
+                "feedback_store_path": local_result.get("feedback_store_path", ""),
+                "row": local_result.get("row", {}),
+            }
 
     return {
         **local_result,

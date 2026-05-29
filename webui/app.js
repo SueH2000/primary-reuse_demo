@@ -55,8 +55,27 @@ function setStatus(kind, text) {
   pill.className = "status-pill";
   if (kind === "success") pill.classList.add("success");
   if (kind === "error") pill.classList.add("error");
+  if (kind === "warning") pill.classList.add("warning");
   pill.textContent = kind;
   msg.textContent = text;
+}
+
+function showToast(kind, text) {
+  let host = document.getElementById("toastHost");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "toastHost";
+    host.className = "toast-host";
+    document.body.appendChild(host);
+  }
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${kind || "info"}`;
+  toast.textContent = text;
+  host.appendChild(toast);
+  window.setTimeout(() => {
+    toast.classList.add("toast-hide");
+    window.setTimeout(() => toast.remove(), 280);
+  }, 4800);
 }
 
 function loadActiveJobsFromStorage() {
@@ -901,9 +920,18 @@ function escapeHtml(value) {
 }
 
 async function parseJsonResponse(response) {
-  const body = await response.json().catch(() => ({}));
+  const rawText = await response.text();
+  let body = {};
+  if (rawText) {
+    try {
+      body = JSON.parse(rawText);
+    } catch {
+      body = { message: rawText.slice(0, 800) };
+    }
+  }
   if (!response.ok) {
-    const message = body.detail || body.message || `HTTP ${response.status}`;
+    const detail = Array.isArray(body.detail) ? JSON.stringify(body.detail) : body.detail;
+    const message = detail || body.message || rawText.slice(0, 800) || `HTTP ${response.status}`;
     throw new Error(message);
   }
   return body;
@@ -1372,13 +1400,30 @@ async function submitFeedback(event) {
 
 async function saveFeedback(markCorrect) {
   const result = state.currentResult;
+  const feedbackResult = byId("feedbackResult");
+  const submitButton = byId("feedbackForm")?.querySelector('button[type="submit"]');
+  const confirmButton = byId("feedbackConfirmCorrect");
+
   if (!result) {
-    setStatus("error", "Run a classification first, then submit reviewer feedback.");
+    const message = "Run a classification first, then submit reviewer feedback.";
+    feedbackResult.textContent = message;
+    feedbackResult.className = "feedback-result feedback-error";
+    setStatus("error", message);
+    showToast("error", message);
     return;
   }
+
   const predictedLabel = byId("feedbackPredictedLabel").value;
   const correctedLabel = markCorrect ? predictedLabel : byId("feedbackCorrectedLabel").value;
-  setStatus("running", markCorrect ? "Saving reviewer confirmation that the prediction is correct." : "Saving reviewer correction to pending feedback storage.");
+  const runningMessage = markCorrect
+    ? "Saving reviewer confirmation to pending feedback storage..."
+    : "Saving reviewer correction to pending feedback storage...";
+  setStatus("running", runningMessage);
+  feedbackResult.textContent = runningMessage;
+  feedbackResult.className = "feedback-result feedback-running";
+  if (submitButton) submitButton.disabled = true;
+  if (confirmButton) confirmButton.disabled = true;
+
   try {
     const payload = {
       paper_id: result.paper_id || result.lookup?.paper_id || null,
@@ -1404,6 +1449,7 @@ async function saveFeedback(markCorrect) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).then(parseJsonResponse);
+
     if (state.currentBatchSelectedIndex >= 0) {
       state.batchReviewStatus[state.currentBatchSelectedIndex] = markCorrect ? "confirmed" : "corrected";
       highlightSelectedBatchRow();
@@ -1411,13 +1457,30 @@ async function saveFeedback(markCorrect) {
     const feedbackCard = document.querySelector(".feedback-card");
     feedbackCard.classList.remove("feedback-confirmed", "feedback-corrected");
     feedbackCard.classList.add(markCorrect ? "feedback-confirmed" : "feedback-corrected");
-    const storageLabel = response.storage === "supabase_pending_feedback" ? "pending Supabase feedback" : (response.feedback_store_path || "local feedback storage");
-    byId("feedbackResult").textContent = markCorrect
-      ? `Confirmed and saved to ${storageLabel}. Review status: ${response.review_status || "pending"}.`
-      : `Correction saved to ${storageLabel}. Review status: ${response.review_status || "pending"}.`;
-    setStatus("success", markCorrect ? "Reviewer confirmation saved." : "Reviewer correction saved.");
+
+    const storageLabel = response.storage === "supabase_pending_feedback"
+      ? "Supabase pending review table"
+      : response.storage === "local_feedback_csv_supabase_failed"
+        ? "local fallback CSV; Supabase insert failed"
+        : (response.feedback_store_path || "local feedback storage");
+    const successMessage = response.message || (markCorrect
+      ? `Thank you. Confirmation saved to ${storageLabel}.`
+      : `Thank you. Feedback saved to ${storageLabel}.`);
+    const warningMessage = response.warning ? ` Warning: ${response.warning}` : "";
+
+    feedbackResult.textContent = `${successMessage} Review status: ${response.review_status || "pending"}.${warningMessage}`;
+    feedbackResult.className = response.warning ? "feedback-result feedback-warning" : "feedback-result feedback-success";
+    setStatus(response.warning ? "warning" : "success", response.warning ? "Feedback saved locally, but Supabase insert needs attention." : "Thank you. Feedback saved successfully.");
+    showToast(response.warning ? "warning" : "success", response.warning ? "Feedback saved locally, but Supabase failed. Check settings." : "Thank you. Feedback saved successfully.");
   } catch (error) {
-    setStatus("error", `Feedback save failed: ${error.message}`);
+    const message = `Feedback save failed: ${error.message}`;
+    feedbackResult.textContent = message;
+    feedbackResult.className = "feedback-result feedback-error";
+    setStatus("error", message);
+    showToast("error", message);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+    if (confirmButton) confirmButton.disabled = false;
   }
 }
 
