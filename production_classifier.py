@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -437,6 +438,9 @@ class ProductionClassifier:
             "route_llm_review_threshold": float(self.cfg.route_llm_review_threshold),
             "rag_top_k": int(self.cfg.rag_top_k),
             "ollama_model": self.cfg.ollama_model,
+            "ollama_url": self.cfg.ollama_url,
+            "llm_provider": "ollama_cloud" if "ollama.com" in str(self.cfg.ollama_url) else "ollama_local",
+            "llm_auth_configured": bool(os.getenv("OLLAMA_API_KEY", "").strip()),
             "indexed_articles": int(len({v["paper_id"] for v in self.article_index.values()})),
             "feedback_store_path": str(self.feedback_store_path),
             "article_cache_dir": str(self.cfg.article_cache_dir),

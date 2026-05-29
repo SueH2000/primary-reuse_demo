@@ -950,7 +950,11 @@ async function loadMetadata() {
     byId("metaTrainingRows").textContent = meta.training_rows ?? "-";
     byId("metaIndexedArticles").textContent = meta.indexed_articles ?? "-";
     byId("metaExtractionMode").textContent = meta.extraction_mode ?? "-";
-    byId("metaOllamaModel").textContent = meta.ollama_model ?? "-";
+    const llmProvider = meta.llm_provider || "ollama_local";
+    const authHint = meta.llm_provider === "ollama_cloud"
+      ? (meta.llm_auth_configured ? "auth configured" : "missing API key")
+      : "local";
+    byId("metaOllamaModel").textContent = `${llmProvider}: ${meta.ollama_model ?? "-"} (${authHint})`;
     byId("metaLabeledBank").textContent = meta.labeled_csv_path || "-";
     if (byId("mohammadSummary")) {
       if (mohammadInfo.exists) {

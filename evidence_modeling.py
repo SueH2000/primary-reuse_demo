@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from dataclasses import asdict
 from dataclasses import dataclass
@@ -1147,8 +1148,14 @@ def call_ollama_for_eval(prompt: str, cfg: ModelingConfig) -> Dict[str, Any]:
             "num_predict": cfg.llm_num_predict,
         },
     }
+    headers = {"Content-Type": "application/json"}
+    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
     response = requests.post(
         cfg.ollama_url,
+        headers=headers,
         json=payload,
         timeout=(cfg.llm_timeout_connect, cfg.llm_timeout_read),
     )
