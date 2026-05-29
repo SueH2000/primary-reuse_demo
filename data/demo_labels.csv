@@ -1,0 +1,13 @@
+paper_id,title,ground_truth
+DEMO_PRIMARY_001,Demo ChIP-seq primary cohort study,Primary
+DEMO_PRIMARY_002,Demo RNA-seq generated patient cohort,Primary
+DEMO_PRIMARY_003,Demo authors generated tumor sequencing data,Primary
+DEMO_PRIMARY_004,Demo deposited new expression data,Primary
+DEMO_PRIMARY_005,Demo own samples profiled by sequencing,Primary
+DEMO_PRIMARY_006,Demo recruited cohort and deposited data,Primary
+DEMO_REUSE_001,Demo public GEO reanalysis study,Reuse
+DEMO_REUSE_002,Demo downloaded external transcriptomic datasets,Reuse
+DEMO_REUSE_003,Demo secondary analysis of public data,Reuse
+DEMO_REUSE_004,Demo integrated analysis from GEO,Reuse
+DEMO_REUSE_005,Demo obtained datasets from SRA,Reuse
+DEMO_REUSE_006,Demo reused publicly available microarray data,Reuse

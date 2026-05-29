@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local runtime state and generated jobs
+runtime_state/
+cache/
+batch_jobs/
+import_jobs/
+fetch_jobs/
+outputs*/
+*.log
+
+# Private project data - do not publish
+manual_ground_truth_with_GSE_links_REFRESHED.csv
+pmc_gse_articles.jsonl
+Mohammad_doi.csv
+rag_feedback_gold_standard.csv
+rag_bank_refreshed.csv
+rag_bank_refresh_report.json
+mohammad_geo_articles.jsonl
+fetched_articles.jsonl
+
+# Local secrets/config
+.env
+.env.*
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Large model / serialized artifacts
+*.pkl
+*.pickle
+*.joblib
+*.db
+*.sqlite
+!.env.example

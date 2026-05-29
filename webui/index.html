@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Primary vs Reuse Review Console</title>
+  <link rel="stylesheet" href="/ui-static/app.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Biomedical Provenance Review Console</p>
+        <h1>Evidence-backed provenance review for biomedical papers.</h1>
+        <p class="hero-text">
+          Classify whether a paper mainly uses author-generated data or reused public datasets,
+          inspect the evidence trail, and collect reviewer feedback for later RAG-bank curation.
+        </p>
+        <div class="hero-badges" aria-label="Demo policy">
+          <span class="status-chip strong">Stable default: Hybrid baseline</span>
+          <span class="status-chip">LLM = advisory reviewer</span>
+          <span class="status-chip">Feedback = pending review</span>
+        </div>
+        <div class="hero-actions">
+          <button class="primary" type="button" id="heroStartMohammad">Start from Mohammad DOI database</button>
+        </div>
+      </div>
+      <div class="hero-meta" id="metaCards">
+        <div class="metric-card">
+          <span class="metric-label">Training rows</span>
+          <strong id="metaTrainingRows">-</strong>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Indexed articles</span>
+          <strong id="metaIndexedArticles">-</strong>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Extraction mode</span>
+          <strong id="metaExtractionMode">-</strong>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">LLM model</span>
+          <strong id="metaOllamaModel">-</strong>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Active labeled bank</span>
+          <strong id="metaLabeledBank">-</strong>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel panel-left">
+        <div class="toolbar">
+          <div class="tab-strip" role="tablist" aria-label="Classification input mode">
+            <button class="tab-button active" data-tab="paste" type="button">Paste Article</button>
+            <button class="tab-button" data-tab="identifier" type="button">Identifier</button>
+            <button class="tab-button" data-tab="upload" type="button">Batch Upload</button>
+            <button class="tab-button" data-tab="mohammad" type="button">Fetch Articles</button>
+          </div>
+          <div class="selector-groups model-selector-card">
+            <div class="mode-selector-head">
+              <div>
+                <span class="compare-toolbar-label">Decision pipeline</span>
+                <p class="help-text selector-help">
+                  Compare one or more <strong>base decision models</strong>. If you enable the <strong>LLM reviewer</strong>, retrieved RAG neighbors are injected into the LLM prompt as grounding context.
+                  RAG therefore appears in two places: as an optional baseline comparator and as evidence context for the reviewer. High-confidence baseline decisions remain locked.
+                </p>
+              </div>
+              <button class="ghost ghost-small" type="button" id="resetModeSelection">Reset to stable default</button>
+            </div>
+
+            <div class="pipeline-selector-grid">
+              <section class="mode-section">
+                <div class="mode-section-title">
+                  <strong>1. Base decision model(s)</strong>
+                  <span>Select one or more paths to compare</span>
+                </div>
+                <div class="mode-grid compact-mode-grid">
+                  <button class="process-node process-node-branch process-node-selectable" type="button" data-base-mode="linear_only">
+                    <strong>Linear only</strong>
+                    <span>Plain evidence text features only</span>
+                  </button>
+                  <button class="process-node process-node-branch process-node-selectable is-selected" type="button" data-base-mode="hybrid_baseline" aria-pressed="true">
+                    <strong>Hybrid baseline</strong>
+                    <span>Linear model + RAG features. Stable default.</span>
+                  </button>
+                  <button class="process-node process-node-branch process-node-selectable" type="button" data-base-mode="rag_vote_only">
+                    <strong>RAG vote only</strong>
+                    <span>Retrieval vote from labeled neighbors</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="mode-section rag-context-section">
+                <div class="mode-section-title">
+                  <strong>2. RAG grounding for LLM</strong>
+                  <span>Context source, not a separate model</span>
+                </div>
+                <label class="rag-context-toggle">
+                  <input type="checkbox" id="includeRagContextForLlm" checked>
+                  <span>Send retrieved labeled examples to the LLM reviewer prompt</span>
+                </label>
+                <label class="rag-topk-control">
+                  <span>Top-k sent to LLM</span>
+                  <input type="number" id="llmRagTopK" min="0" max="10" value="3">
+                </label>
+                <p class="help-text selector-help">
+                  When this is enabled, the LLM reviewer receives target evidence, structured provenance, and retrieved labeled examples. When disabled, the UI hides the LLM grounding-neighbor table and the LLM receives no retrieved examples. <strong>RAG vote only</strong> remains available as a separate baseline comparator.
+                </p>
+              </section>
+
+              <section class="mode-section">
+                <div class="mode-section-title">
+                  <strong>3. Optional LLM reviewer</strong>
+                  <span>Runs after each selected base model</span>
+                </div>
+                <div class="mode-grid compact-mode-grid reviewer-grid">
+                  <button class="process-node process-node-branch process-node-selectable is-selected" type="button" data-reviewer-mode="none" aria-pressed="true">
+                    <strong>No LLM reviewer</strong>
+                    <span>Use baseline decision only</span>
+                  </button>
+                  <button class="process-node process-node-branch process-node-selectable" type="button" data-reviewer-mode="llm_sentence_judge_routed">
+                    <strong>Sentence reviewer, routed</strong>
+                    <span>LLM checks routed review rows only</span>
+                  </button>
+                  <button class="process-node process-node-branch process-node-selectable" type="button" data-reviewer-mode="llm_sentence_judge_force">
+                    <strong>Sentence reviewer, force</strong>
+                    <span>LLM checks every row; lock still applies</span>
+                  </button>
+                  <button class="process-node process-node-branch process-node-selectable" type="button" data-reviewer-mode="llm_final_classify_routed">
+                    <strong>LLM classifier, routed</strong>
+                    <span>LLM proposes a label only on routed review rows</span>
+                  </button>
+                  <button class="process-node process-node-branch process-node-selectable" type="button" data-reviewer-mode="llm_final_classify_force">
+                    <strong>LLM classifier, force</strong>
+                    <span>LLM proposes a label on every row; lock still applies</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div class="selected-mode-bar" id="selectedModeBar">Base models: Hybrid baseline | Reviewer: No LLM reviewer</div>
+          </div>        </div>
+
+        <section class="tab-panel active" data-panel="paste">
+          <form id="pasteForm" class="form-stack">
+            <label class="field">
+              <span>Title</span>
+              <input type="text" id="pasteTitle" placeholder="Optional paper title">
+            </label>
+            <label class="field">
+              <span>Paper ID</span>
+              <input type="text" id="pastePaperId" placeholder="Optional local paper_id or PMCID">
+            </label>
+            <label class="field">
+              <span>Article text</span>
+              <textarea id="pasteText" rows="16" placeholder="Paste full article text, abstract + body, or extracted sections"></textarea>
+            </label>
+            <div class="actions">
+              <button class="primary" type="submit">Classify article</button>
+              <button class="ghost" type="button" id="pasteSample">Load sample text</button>
+            </div>
+            <p class="help-text">
+              Select one model to run one path, or select multiple models to compare them on the same article.
+            </p>
+          </form>
+        </section>
+
+        <section class="tab-panel" data-panel="identifier">
+          <form id="identifierForm" class="form-stack">
+            <label class="field">
+              <span>Identifier</span>
+              <input type="text" id="identifierValue" placeholder="PMC7609712 or other locally indexed identifier">
+            </label>
+            <p class="help-text">
+              Current local lookup is dependable for `paper_id` and PMC-like identifiers. DOI lookup requires DOI metadata in the local index.
+            </p>
+            <div class="actions">
+              <button class="primary" type="submit">Lookup and classify</button>
+            </div>
+            <p class="help-text">
+              Select one model to run one path, or select multiple models to compare them on the same identifier.
+            </p>
+          </form>
+        </section>
+
+        <section class="tab-panel" data-panel="upload">
+          <form id="uploadForm" class="form-stack">
+            <label class="field">
+              <span>Upload file</span>
+              <input type="file" id="uploadFile" accept=".csv,.jsonl,.json">
+            </label>
+            <p class="help-text">
+              Accepted row fields: `text`, `full_text`, `article_text`, `title`, `paper_id`, `pmcid`, `doi`, `identifier`.
+              Large uploads now run as async jobs and can be downloaded again as JSON or CSV.
+            </p>
+            <p class="help-text">
+              Refreshing the page clears the browser file picker, but any active batch job keeps running on the server and the UI will reconnect automatically.
+            </p>
+            <div class="actions">
+              <button class="primary" type="submit">Run batch classification</button>
+              <button class="ghost" type="button" id="downloadBatchJson" disabled>Download batch JSON</button>
+              <button class="ghost" type="button" id="downloadBatchCsv" disabled>Download batch CSV</button>
+            </div>
+          </form>
+          <div class="batch-summary" id="batchSummary"></div>
+          <div class="table-shell hidden" id="batchTableShell">
+            <table id="batchTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Paper</th>
+                  <th>Final label</th>
+                  <th>Confidence</th>
+                  <th>Route</th>
+                  <th>GSE</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="mohammad">
+          <div class="workflow-card">
+            <h2>Start from Mohammad_doi.csv</h2>
+            <p class="help-text">
+              Use this when the workflow should begin from the known GEO/GSE-linked article list.
+              The importer prefers already indexed local PMCID articles and only fetches remotely when needed.
+            </p>
+            <ol class="workflow-steps">
+              <li>Read GEO-linked PMCIDs from `Mohammad_doi.csv`.</li>
+              <li>Reuse local JSONL articles first, then fetch missing PMCID full text.</li>
+              <li>Write a new JSONL and optionally activate it as the current lookup source.</li>
+            </ol>
+          </div>
+          <form id="mohammadForm" class="form-stack">
+            <label class="field">
+              <span>Batch size</span>
+              <input type="number" id="mohammadSampleSize" min="0" value="200">
+            </label>
+            <label class="field">
+              <span>Batch start offset</span>
+              <input type="number" id="mohammadBatchStart" min="0" value="0">
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="mohammadSkipGoldStandard" checked>
+              <span>Skip articles already present in the gold-standard CSV</span>
+            </label>
+            <label class="field">
+              <span>Output JSONL filename</span>
+              <input type="text" id="mohammadOutputJsonl" value="mohammad_geo_articles.jsonl">
+            </label>
+            <p class="help-text">
+              This starts from the Mohammad GEO/GSE mapping CSV, prefers already indexed local articles,
+              and only falls back to remote fetch when a PMCID is missing locally. By default it skips
+              articles already present in the gold-standard CSV and fetches a sequential batch from the remaining list.
+              The normal paste, DOI, identifier, and batch windows remain available.
+            </p>
+            <div class="actions">
+              <button class="primary" type="submit">Import Mohammad subset</button>
+              <button class="ghost" type="button" id="importActivateMohammad">Import and activate source</button>
+              <button class="ghost" type="button" id="downloadMohammadJsonl" disabled>Download imported JSONL</button>
+              <button class="ghost" type="button" id="activateMohammadJsonl" disabled>Use as active lookup source</button>
+            </div>
+          </form>
+          <div class="batch-summary" id="mohammadSummary"></div>
+
+          <div class="workflow-card">
+            <h2>Fetch new articles from DOI / PMCID lists</h2>
+            <p class="help-text">
+              Use this when you have a new batch of article identifiers. You can paste DOI or PMCID values,
+              or upload a `.csv`, `.jsonl`, `.json`, or `.txt` file containing `identifier`, `doi`, `pmcid`, or `paper_id`.
+            </p>
+          </div>
+          <form id="genericFetchForm" class="form-stack">
+            <label class="field">
+              <span>Paste DOI / PMCID list</span>
+              <textarea id="genericFetchText" rows="7" placeholder="10.1093/nar/gkaa...&#10;PMC1234567&#10;10.1038/...."></textarea>
+            </label>
+            <label class="field">
+              <span>Or upload identifier file</span>
+              <input type="file" id="genericFetchFile" accept=".csv,.jsonl,.json,.txt">
+            </label>
+            <label class="field">
+              <span>Output JSONL filename</span>
+              <input type="text" id="genericFetchOutputJsonl" value="fetched_articles.jsonl">
+            </label>
+            <div class="actions">
+              <button class="primary" type="submit">Fetch articles from identifiers</button>
+              <button class="ghost" type="button" id="genericFetchAndActivate">Fetch and activate source</button>
+              <button class="ghost" type="button" id="downloadGenericFetchJsonl" disabled>Download fetched JSONL</button>
+              <button class="ghost" type="button" id="activateGenericFetchJsonl" disabled>Use fetched JSONL as active lookup source</button>
+            </div>
+          </form>
+          <div class="batch-summary" id="genericFetchSummary"></div>
+        </section>
+
+        <section class="detail-card server-jobs-card" id="serverJobsCard">
+          <div class="detail-head">
+            <h2>Server jobs</h2>
+            <button class="ghost ghost-small" type="button" id="refreshServerJobs">Refresh</button>
+          </div>
+          <p class="help-text">
+            Active jobs are still attached to this server process. Recent jobs include completed runs and stale entries from older sessions.
+          </p>
+          <div class="server-jobs-section">
+            <div class="server-jobs-group">
+              <span class="summary-label">Active</span>
+              <div class="server-jobs-list" id="serverJobsActive"></div>
+            </div>
+            <div class="server-jobs-group">
+              <span class="summary-label">Recent</span>
+              <div class="server-jobs-list server-jobs-scroll" id="serverJobsRecent"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <aside class="panel panel-right">
+        <div class="status-row">
+          <span class="status-pill" id="statusPill">Idle</span>
+          <span class="status-text" id="statusText">Waiting for a request.</span>
+        </div>
+        <section class="progress-shell hidden" id="jobProgressShell" aria-live="polite">
+          <div class="progress-meta">
+            <span id="jobProgressLabel">No active job</span>
+            <strong id="jobProgressValue">0%</strong>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="jobProgressFill"></div>
+          </div>
+        </section>
+
+        <section class="result-summary" id="resultSummary">
+          <div class="summary-grid">
+            <div class="summary-card highlight-card">
+              <span class="summary-label">Final label</span>
+              <strong id="finalLabel">-</strong>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">Decision source</span>
+              <strong id="finalSource">-</strong>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">Displayed mode</span>
+              <strong id="displayedMode">-</strong>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">Hybrid confidence</span>
+              <strong id="hybridConfidence">-</strong>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">Recommended route</span>
+              <strong id="recommendedRoute">-</strong>
+            </div>
+          </div>
+          <div class="decision-policy-banner" id="decisionPolicyBanner">
+            Stable policy: selected baseline model(s) produce evidence-based decisions. Optional LLM reviewer receives RAG-grounded context and remains advisory when the selected baseline is high-confidence.
+          </div>
+          <div class="multi-mode-notice hidden" id="multiModeNotice">
+            Multiple modes selected. The main panel shows one inspected mode. Click a comparison card below to inspect that mode's full audit.
+          </div>
+        </section>
+
+        <section class="details-stack">
+          <div class="detail-card hidden" id="strategyComparePanel">
+            <div class="detail-head">
+              <h2>Model and strategy comparison</h2>
+            </div>
+            <p class="help-text">
+              This section compares each selected baseline model. When an LLM reviewer is enabled, retrieved RAG neighbors are included in the reviewer prompt as grounding context unless disabled.
+            </p>
+            <div class="compare-grid" id="strategyCompareGrid"></div>
+          </div>
+
+          <div class="detail-card">
+            <div class="detail-head">
+              <h2>Article overview</h2>
+            </div>
+            <dl class="detail-grid">
+              <div>
+                <dt>Paper ID</dt>
+                <dd id="detailPaperId">-</dd>
+              </div>
+              <div>
+                <dt>Title</dt>
+                <dd id="detailTitle">-</dd>
+              </div>
+              <div>
+                <dt>Route reason</dt>
+                <dd id="detailRouteReason">-</dd>
+              </div>
+              <div>
+                <dt>Lookup status</dt>
+                <dd id="detailLookupStatus">-</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="detail-card">
+            <div class="detail-head">
+              <h2>GSE and accessions</h2>
+            </div>
+            <p class="help-text" id="mainDecisionGseLabel">Main decision GSE: -</p>
+            <div class="chip-group" id="gseChips"></div>
+            <div class="link-list" id="gseLinks"></div>
+            <div class="link-list" id="mainDecisionGseLinks"></div>
+            <div class="chip-group secondary" id="accessionChips"></div>
+          </div>
+
+          <div class="detail-card">
+            <div class="detail-head">
+              <h2>Main decision sentence</h2>
+            </div>
+            <p class="main-sentence" id="mainDecisionSentence">No result yet.</p>
+            <p class="help-text" id="mainDecisionRole">-</p>
+          </div>
+
+          <details class="detail-card compact-detail">
+            <summary>
+              <span>Internal model signals</span>
+            </summary>
+            <dl class="detail-grid compact">
+              <div>
+                <dt>Linear</dt>
+                <dd id="predLinear">-</dd>
+              </div>
+              <div>
+                <dt>Linear + RAG</dt>
+                <dd id="predHybrid">-</dd>
+              </div>
+              <div>
+                <dt>RAG vote</dt>
+                <dd id="predRagVote">-</dd>
+              </div>
+              <div>
+                <dt>RAG margin</dt>
+                <dd id="predRagMargin">-</dd>
+              </div>
+            </dl>
+            <p class="help-text" id="ragMarginHelp">
+              RAG margin = weighted Primary score minus weighted Reuse score. Larger absolute gap means retrieval was more decisive.
+            </p>
+          </details>
+
+          <div class="detail-card">
+            <div class="detail-head">
+              <h2>LLM audit</h2>
+            </div>
+            <dl class="detail-grid compact">
+              <div>
+                <dt>Requested</dt>
+                <dd id="llmRequested">-</dd>
+              </div>
+              <div>
+                <dt>Called</dt>
+                <dd id="llmCalled">-</dd>
+              </div>
+              <div>
+                <dt>Valid output</dt>
+                <dd id="llmValid">-</dd>
+              </div>
+              <div>
+                <dt>Strategy</dt>
+                <dd id="llmStrategy">-</dd>
+              </div>
+              <div>
+                <dt>LLM proposed label</dt>
+                <dd id="llmProposedLabel">-</dd>
+              </div>
+              <div>
+                <dt>LLM confidence</dt>
+                <dd id="llmConfidence">-</dd>
+              </div>
+              <div>
+                <dt>Used for final</dt>
+                <dd id="llmUsedForFinal">-</dd>
+              </div>
+              <div>
+                <dt>Override status</dt>
+                <dd id="llmOverrideStatus">-</dd>
+              </div>
+              <div>
+                <dt>Advisory only</dt>
+                <dd id="llmAdvisoryOnly">-</dd>
+              </div>
+              <div>
+                <dt>Lock applied</dt>
+                <dd id="llmOverrideLockApplied">-</dd>
+              </div>
+              <div>
+                <dt>Lock threshold</dt>
+                <dd id="llmOverrideLockThreshold">-</dd>
+              </div>
+              <div>
+                <dt>RAG context sent</dt>
+                <dd id="llmRagContextSent">-</dd>
+              </div>
+              <div>
+                <dt>RAG context top-k</dt>
+                <dd id="llmRagContextTopK">-</dd>
+              </div>
+            </dl>
+            <p class="help-text" id="llmAuditMessage">No LLM audit yet.</p>
+            <pre id="llmRawOutput">No LLM output.</pre>
+          </div>
+
+          <details class="detail-card">
+            <summary>
+              <span>Structured evidence</span>
+            </summary>
+            <pre id="structuredEvidence">No result yet.</pre>
+          </details>
+
+          <details class="detail-card">
+            <summary>
+              <span>Evidence text</span>
+            </summary>
+            <pre id="evidenceText">No result yet.</pre>
+          </details>
+
+          <details class="detail-card" id="neighborDetailCard">
+            <summary>
+              <span id="neighborDetailTitle">LLM grounding neighbors</span>
+            </summary>
+            <div class="table-shell">
+              <table id="neighborsTable">
+                <thead>
+                  <tr>
+                    <th>Paper</th>
+                    <th>Label</th>
+                    <th>Score</th>
+                    <th>Snippet</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="detail-card" id="ragContextDetailCard">
+            <summary>
+              <span id="ragContextDetailTitle">LLM RAG prompt context</span>
+            </summary>
+            <pre id="standardRagContext">No result yet.</pre>
+          </details>
+        </section>
+
+        <section class="feedback-card">
+          <div class="detail-head">
+            <h2>Reviewer correction</h2>
+          </div>
+          <p class="help-text" id="feedbackHelpText">
+            Feedback is stored as pending review first. It does not update the RAG/gold-standard bank until a curator approves and exports it.
+          </p>
+          <form id="feedbackForm" class="form-stack">
+            <label class="field">
+              <span>Predicted label</span>
+              <input type="text" id="feedbackPredictedLabel" readonly>
+            </label>
+            <label class="field">
+              <span>Corrected label</span>
+              <select id="feedbackCorrectedLabel">
+                <option value="Primary">Primary</option>
+                <option value="Reuse">Reuse</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Reviewer</span>
+              <input type="text" id="feedbackReviewer" placeholder="Optional reviewer name">
+            </label>
+            <label class="field">
+              <span>Reviewer email</span>
+              <input type="email" id="feedbackReviewerEmail" placeholder="Optional email for follow-up">
+            </label>
+            <label class="field">
+              <span>Evidence sentence</span>
+              <textarea id="feedbackEvidenceSentence" rows="3" placeholder="Paste the sentence that supports your correction, or leave blank to use the detected main decision sentence"></textarea>
+            </label>
+            <label class="field">
+              <span>Note</span>
+              <textarea id="feedbackNote" rows="4" placeholder="Why the correction was needed"></textarea>
+            </label>
+            <label class="toggle compact">
+              <input type="checkbox" id="feedbackConsentStoreText">
+              <span>I agree that the submitted input text may be stored for curation and improving the RAG bank after review.</span>
+            </label>
+            <div class="actions">
+              <button class="ghost" type="button" id="feedbackConfirmCorrect">Mark prediction correct</button>
+              <button class="primary" type="submit">Save feedback</button>
+            </div>
+          </form>
+          <div id="feedbackResult" class="feedback-result"></div>
+          <div class="detail-head feedback-bank-head">
+            <h2>Refresh reviewed RAG bank</h2>
+          </div>
+          <p class="help-text">
+            Public demo feedback is first stored as pending review. Export only approved feedback to <code>rag_feedback_gold_standard.csv</code>, then merge it into a refreshed labeled bank.
+          </p>
+          <div class="actions">
+            <button class="ghost" type="button" id="refreshRagBank">Refresh and activate bank</button>
+          </div>
+          <div id="ragBankResult" class="feedback-result"></div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/ui-static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: primary-reuse-provenance-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn classification_api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PUBLIC_DEMO_MODE
+        value: "true"
+      - key: USE_OLLAMA
+        value: "false"
+      - key: USE_SUPABASE_FEEDBACK
+        value: "true"
+      - key: SUPABASE_FEEDBACK_TABLE
+        value: "rag_feedback"
